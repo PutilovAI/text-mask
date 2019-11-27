@@ -3,3 +3,4 @@ stats.json
 .idea
 aot
 angular2/coverage
+addons/dist/stats.json
