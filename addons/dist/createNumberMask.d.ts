@@ -10,7 +10,7 @@ export interface ICreateNumberMaskConfig {
     allowNegative?: boolean;
     allowLeadingZeroes?: boolean;
     integerLimit?: number | null;
-    maxValue: number;
-    minValue: number;
+    maxValue?: number;
+    minValue?: number;
 }
 export default function createNumberMask(config: ICreateNumberMaskConfig): (rawValue: string) => Array<string>
