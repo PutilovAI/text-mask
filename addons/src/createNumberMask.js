@@ -9,21 +9,22 @@ const number = 'number'
 const digitRegExp = /\d/
 const caretTrap = '[]'
 
-export default function createNumberMask({
-  prefix = dollarSign,
-  suffix = emptyString,
-  includeThousandsSeparator = true,
-  thousandsSeparatorSymbol = comma,
-  allowDecimal = false,
-  decimalSymbol = period,
-  decimalLimit = 2,
-  requireDecimal = false,
-  allowNegative = false,
-  allowLeadingZeroes = false,
-  integerLimit = null,
-  maxValue = Number.POSITIVE_INFINITY,
-  minValue = Number.NEGATIVE_INFINITY
-} = {}) {
+export default function createNumberMask(
+    {
+      prefix = dollarSign,
+      suffix = emptyString,
+      includeThousandsSeparator = true,
+      thousandsSeparatorSymbol = comma,
+      allowDecimal = false,
+      decimalSymbol = period,
+      decimalLimit = 2,
+      requireDecimal = false,
+      allowNegative = false,
+      allowLeadingZeroes = false,
+      integerLimit = null,
+      maxValue = Number.POSITIVE_INFINITY,
+    } = {}) {
+
   const prefixLength = prefix && prefix.length || 0
   const suffixLength = suffix && suffix.length || 0
   const thousandsSeparatorSymbolLength = thousandsSeparatorSymbol && thousandsSeparatorSymbol.length || 0
@@ -31,74 +32,82 @@ export default function createNumberMask({
   function numberMask(rawValue = emptyString) {
     const rawValueLength = rawValue.length
 
+    // Строка пустая или равна префиксу и длина 1
     if (
-      rawValue === emptyString ||
-      (rawValue[0] === prefix[0] && rawValueLength === 1)
+        rawValue === emptyString ||
+        (rawValue[0] === prefix[0] && rawValueLength === 1)
     ) {
       return prefix.split(emptyString).concat([digitRegExp]).concat(suffix.split(emptyString))
-    } else if(
-      rawValue === decimalSymbol &&
-      allowDecimal
+    } else if ( // Строка равна символу дробного разделителя и дробные числа разрешены
+        rawValue === decimalSymbol &&
+        allowDecimal
     ) {
       return prefix.split(emptyString).concat(['0', decimalSymbol, digitRegExp]).concat(suffix.split(emptyString))
     }
 
     const isNegative = (rawValue[0] === minus) && allowNegative
     //If negative remove "-" sign
-    if(isNegative) {
+    if (isNegative) {
       rawValue = rawValue.toString().substr(1)
     }
 
     const indexOfLastDecimal = rawValue.lastIndexOf(decimalSymbol)
     const hasDecimal = indexOfLastDecimal !== -1
 
-    let integer
-    let fraction
-    let mask
-    let value
+    const hasWorkWithDecimal = hasDecimal && (allowDecimal || requireDecimal);
+    let integer;
+    let fraction;
+    let mask;
+    let value;
+    let isLimitMax;
+    let maxInt;
+    let maxFraction;
 
     // remove the suffix
     if (rawValue.slice(suffixLength * -1) === suffix) {
       rawValue = rawValue.slice(0, suffixLength * -1)
     }
 
-    if (hasDecimal && (allowDecimal || requireDecimal)) {
-      integer = rawValue.slice(rawValue.slice(0, prefixLength) === prefix ? prefixLength : 0, indexOfLastDecimal)
-
-      fraction = rawValue.slice(indexOfLastDecimal + 1, rawValueLength)
-      value = parseFloat(`${integer}.${fraction}`)
-      fraction = convertToMask(fraction.replace(nonDigitsRegExp, emptyString))
-    } else {
+    // дробные числа
+    if (hasWorkWithDecimal) {
+      integer = rawValue.slice(rawValue.slice(0, prefixLength) === prefix ? prefixLength : 0, indexOfLastDecimal);
+      fraction = rawValue.slice(indexOfLastDecimal + 1, rawValueLength);
+    } else { // остальные
       if (rawValue.slice(0, prefixLength) === prefix) {
         integer = rawValue.slice(prefixLength)
       } else {
         integer = rawValue
       }
-      value = parseInt(integer)
     }
 
-    if (value > maxValue || value < minValue) {
-      return false
+    integer = integer.replace(new RegExp(thousandsSeparatorSymbol, 'g'), '');
+    value = parseFloat(`${integer}.${fraction}`);
+
+    if (value > maxValue) {
+      [maxInt, maxFraction] = maxValue.toString().split('.');
+      isLimitMax = true;
+      integer = maxInt;
+      fraction = hasWorkWithDecimal ? maxFraction : fraction;
     }
 
     if (integerLimit && typeof integerLimit === number) {
-      const thousandsSeparatorRegex = thousandsSeparatorSymbol === '.' ? '[.]' : `${thousandsSeparatorSymbol}`
-      const numberOfThousandSeparators = (integer.match(new RegExp(thousandsSeparatorRegex, 'g')) || []).length
+      const thousandsSeparatorRegex = thousandsSeparatorSymbol === '.' ? '[.]' : `${thousandsSeparatorSymbol}`;
+      const numberOfThousandSeparators = (integer.match(new RegExp(thousandsSeparatorRegex, 'g')) || []).length;
 
-      integer = integer.slice(0, integerLimit + (numberOfThousandSeparators * thousandsSeparatorSymbolLength))
+      integer = integer.slice(0, integerLimit + (numberOfThousandSeparators * thousandsSeparatorSymbolLength));
     }
 
-    integer = integer.replace(nonDigitsRegExp, emptyString)
+    integer = integer.replace(nonDigitsRegExp, emptyString);
 
     if (!allowLeadingZeroes) {
       integer = integer.replace(/^0+(0$|[^0])/, '$1')
     }
 
-    integer = (includeThousandsSeparator) ? addThousandsSeparator(integer, thousandsSeparatorSymbol) : integer
+    integer = (includeThousandsSeparator) ? addThousandsSeparator(integer, thousandsSeparatorSymbol) : integer;
 
-    mask = convertToMask(integer)
+    mask = convertToMask(integer, isLimitMax);
 
-    if ((hasDecimal && allowDecimal) || requireDecimal === true) {
+    if (hasWorkWithDecimal) {
       if (rawValue[indexOfLastDecimal - 1] !== decimalSymbol) {
         mask.push(caretTrap)
       }
@@ -106,6 +115,8 @@ export default function createNumberMask({
       mask.push(decimalSymbol, caretTrap)
 
       if (fraction) {
+        fraction = convertToMask(fraction.replace(nonDigitsRegExp, emptyString), isLimitMax);
+
         if (typeof decimalLimit === number) {
           fraction = fraction.slice(0, decimalLimit)
         }
@@ -143,10 +154,10 @@ export default function createNumberMask({
   return numberMask
 }
 
-function convertToMask(strNumber) {
+function convertToMask(strNumber, isLimitMax) {
   return strNumber
-    .split(emptyString)
-    .map((char) => digitRegExp.test(char) ? digitRegExp : char)
+      .split(emptyString)
+      .map((char) => digitRegExp.test(char) && !isLimitMax ? digitRegExp : char)
 }
 
 // http://stackoverflow.com/a/10899795/604296
