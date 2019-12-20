@@ -4,7 +4,7 @@ export interface ICreateNumberMaskConfig {
     includeThousandsSeparator?: boolean;
     thousandsSeparatorSymbol?: string;
     allowDecimal?: boolean;
-    decimalSymbol?: string;
+    decimalSymbol?: string | Array<string>;
     decimalLimit?: number;
     requireDecimal?: boolean;
     allowNegative?: boolean;

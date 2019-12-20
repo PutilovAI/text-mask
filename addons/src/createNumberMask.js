@@ -1,13 +1,13 @@
-const dollarSign = '$'
-const emptyString = ''
-const comma = ','
-const period = '.'
-const minus = '-'
-const minusRegExp = /-/
-const nonDigitsRegExp = /\D+/g
-const number = 'number'
-const digitRegExp = /\d/
-const caretTrap = '[]'
+const dollarSign = '$';
+const emptyString = '';
+const comma = ',';
+const period = '.';
+const minus = '-';
+const minusRegExp = /-/;
+const nonDigitsRegExp = /\D+/g;
+const number = 'number';
+const digitRegExp = /\d/;
+const caretTrap = '[]';
 
 export default function createNumberMask(
     {
@@ -25,34 +25,51 @@ export default function createNumberMask(
       maxValue = Number.POSITIVE_INFINITY,
     } = {}) {
 
-  const prefixLength = prefix && prefix.length || 0
-  const suffixLength = suffix && suffix.length || 0
-  const thousandsSeparatorSymbolLength = thousandsSeparatorSymbol && thousandsSeparatorSymbol.length || 0
+  let decimalAvailableSymbols = [];
+
+  if (!decimalAvailableSymbols.length) {
+    decimalAvailableSymbols = Array.isArray(decimalSymbol) ? decimalSymbol : [decimalSymbol];
+  }
+  const regExpDecimalSymbols = new RegExp(`[${decimalAvailableSymbols.join('')}]`);
+
+  const prefixLength = prefix && prefix.length || 0;
+  const suffixLength = suffix && suffix.length || 0;
+  const thousandsSeparatorSymbolLength = thousandsSeparatorSymbol && thousandsSeparatorSymbol.length || 0;
 
   function numberMask(rawValue = emptyString) {
-    const rawValueLength = rawValue.length
-
+    const rawValueLength = rawValue.length;
     // Строка пустая или равна префиксу и длина 1
     if (
         rawValue === emptyString ||
         (rawValue[0] === prefix[0] && rawValueLength === 1)
     ) {
       return prefix.split(emptyString).concat([digitRegExp]).concat(suffix.split(emptyString))
-    } else if ( // Строка равна символу дробного разделителя и дробные числа разрешены
-        rawValue === decimalSymbol &&
-        allowDecimal
+    } else if ( // Строка равна одному из доступных символов дробного разделителя и дробные числа разрешены
+        allowDecimal && decimalAvailableSymbols.includes(rawValue)
     ) {
-      return prefix.split(emptyString).concat(['0', decimalSymbol, digitRegExp]).concat(suffix.split(emptyString))
+      return prefix.split(emptyString).concat(['0', regExpDecimalSymbols, digitRegExp]).concat(suffix.split(emptyString))
     }
 
-    const isNegative = (rawValue[0] === minus) && allowNegative
+    const isNegative = (rawValue[0] === minus) && allowNegative;
     //If negative remove "-" sign
     if (isNegative) {
       rawValue = rawValue.toString().substr(1)
     }
 
-    const indexOfLastDecimal = rawValue.lastIndexOf(decimalSymbol)
-    const hasDecimal = indexOfLastDecimal !== -1
+    let indexOfLastDecimal = -1;
+    // Знак разделяющий десятые, который есть в грязном значениии из поля ввода
+    let currentDecimalSymbolInRawValue = decimalAvailableSymbols[0];
+
+    decimalAvailableSymbols.forEach((symbol) => {
+      if (indexOfLastDecimal === -1) {
+        indexOfLastDecimal = rawValue.lastIndexOf(symbol);
+        if (indexOfLastDecimal !== -1) {
+          currentDecimalSymbolInRawValue = symbol;
+        }
+      }
+    });
+
+    const hasDecimal = indexOfLastDecimal !== -1;
 
     const hasWorkWithDecimal = hasDecimal && (allowDecimal || requireDecimal);
     let integer;
@@ -108,11 +125,11 @@ export default function createNumberMask(
     mask = convertToMask(integer, isLimitMax);
 
     if (hasWorkWithDecimal) {
-      if (rawValue[indexOfLastDecimal - 1] !== decimalSymbol) {
+      if (rawValue[indexOfLastDecimal - 1] !== currentDecimalSymbolInRawValue) {
         mask.push(caretTrap)
       }
 
-      mask.push(decimalSymbol, caretTrap)
+      mask.push(regExpDecimalSymbols, caretTrap);
 
       if (fraction) {
         fraction = convertToMask(fraction.replace(nonDigitsRegExp, emptyString), isLimitMax);
@@ -124,7 +141,7 @@ export default function createNumberMask(
         mask = mask.concat(fraction)
       }
 
-      if (requireDecimal === true && rawValue[indexOfLastDecimal - 1] === decimalSymbol) {
+      if (requireDecimal === true && rawValue[indexOfLastDecimal - 1] === currentDecimalSymbolInRawValue) {
         mask.push(digitRegExp)
       }
     }
@@ -149,7 +166,7 @@ export default function createNumberMask(
     return mask
   }
 
-  numberMask.instanceOf = 'createNumberMask'
+  numberMask.instanceOf = 'createNumberMask';
 
   return numberMask
 }
